@@ -1,5 +1,9 @@
+console.log('app.js loading...');
+
 document.addEventListener('DOMContentLoaded', () => {
-    // Elements - matching YOUR new HTML IDs
+    console.log('DOM loaded, initializing app...');
+
+    // Get elements
     const prompt = document.getElementById('prompt');
     const genBtn = document.getElementById('gen-btn');
     const refineField = document.getElementById('refine-field');
@@ -17,17 +21,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const gridBtn = document.getElementById('grid-btn');
     const tags = document.querySelectorAll('.tag');
 
+    // Check if elements exist
+    if (!prompt || !genBtn) {
+        console.error('Required elements not found!');
+        return;
+    }
+
     let modelData = null;
 
     // Initialize Three.js scene
-    initScene(document.getElementById('canvas'));
+    const canvas = document.getElementById('canvas');
+    if (canvas && window.initScene) {
+        window.initScene(canvas);
+    } else {
+        console.error('Canvas or initScene not found');
+    }
 
     // Check backend connection
-    api.health().then(() => {
-        console.log('Backend connected');
-    }).catch(() => {
-        showToast('Cannot connect to server', true);
-    });
+    if (window.api) {
+        window.api.health()
+            .then(() => console.log('Backend connected'))
+            .catch(() => showToast('Cannot connect to server'));
+    }
 
     // Tag presets click
     tags.forEach(tag => {
@@ -49,61 +64,81 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Refine button
-    refineBtn.addEventListener('click', refine);
+    if (refineBtn) {
+        refineBtn.addEventListener('click', refine);
+    }
 
     // Enter key to refine
-    refineInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            refine();
-        }
-    });
+    if (refineInput) {
+        refineInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                refine();
+            }
+        });
+    }
 
     // New/Clear button
-    newBtn.addEventListener('click', resetAll);
+    if (newBtn) {
+        newBtn.addEventListener('click', resetAll);
+    }
 
     // Viewer controls
-    resetBtn.addEventListener('click', () => {
-        resetCamera();
-    });
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            if (window.resetCamera) window.resetCamera();
+        });
+    }
 
-    wireBtn.addEventListener('click', () => {
-        const active = toggleWire();
-        wireBtn.classList.toggle('active', active);
-    });
+    if (wireBtn) {
+        wireBtn.addEventListener('click', () => {
+            if (window.toggleWire) {
+                const active = window.toggleWire();
+                wireBtn.classList.toggle('active', active);
+            }
+        });
+    }
 
-    gridBtn.addEventListener('click', () => {
-        const active = toggleGrid();
-        gridBtn.classList.toggle('active', active);
-    });
+    if (gridBtn) {
+        gridBtn.addEventListener('click', () => {
+            if (window.toggleGrid) {
+                const active = window.toggleGrid();
+                gridBtn.classList.toggle('active', active);
+            }
+        });
+    }
 
     // Download buttons
-    dlGlb.addEventListener('click', () => {
-        if (modelData?.glb) {
-            api.download(modelData.glb, 'model.glb', 'model/gltf-binary');
-            showToast('GLB downloaded!');
-        }
-    });
+    if (dlGlb) {
+        dlGlb.addEventListener('click', () => {
+            if (modelData?.glb && window.api) {
+                window.api.download(modelData.glb, 'model.glb', 'model/gltf-binary');
+                showToast('GLB downloaded!');
+            }
+        });
+    }
 
-    dlObj.addEventListener('click', () => {
-        if (modelData?.obj) {
-            api.download(modelData.obj, 'model.obj', 'text/plain');
-            showToast('OBJ downloaded!');
-        }
-    });
+    if (dlObj) {
+        dlObj.addEventListener('click', () => {
+            if (modelData?.obj && window.api) {
+                window.api.download(modelData.obj, 'model.obj', 'text/plain');
+                showToast('OBJ downloaded!');
+            }
+        });
+    }
 
     // Generate function
     async function generate() {
         const text = prompt.value.trim();
         if (!text) {
-            showToast('Please enter a prompt', true);
+            showToast('Please enter a prompt');
             return;
         }
 
         setLoading(true);
 
         try {
-            const result = await api.generate(text, false);
+            const result = await window.api.generate(text, false);
 
             if (result.success) {
                 modelData = {
@@ -111,20 +146,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     obj: result.model_obj
                 };
 
-                await loadModel(result.model_glb);
+                await window.loadModel(result.model_glb);
 
-                placeholder.classList.add('hide');
-                refineField.classList.add('show');
-                downloads.classList.add('show');
-                dlGlb.disabled = false;
-                dlObj.disabled = false;
+                if (placeholder) placeholder.classList.add('hide');
+                if (refineField) refineField.classList.add('show');
+                if (downloads) downloads.classList.add('show');
+                if (dlGlb) dlGlb.disabled = false;
+                if (dlObj) dlObj.disabled = false;
 
                 showToast('Model generated successfully!');
             } else {
-                showToast(result.message || 'Generation failed', true);
+                showToast(result.message || 'Generation failed');
             }
         } catch (error) {
-            showToast('Error: ' + error.message, true);
+            showToast('Error: ' + error.message);
+            console.error(error);
         }
 
         setLoading(false);
@@ -134,12 +170,12 @@ document.addEventListener('DOMContentLoaded', () => {
     async function refine() {
         const text = refineInput.value.trim();
         if (!text) {
-            showToast('Enter refinement details', true);
+            showToast('Enter refinement details');
             return;
         }
 
         try {
-            const result = await api.generate(text, true);
+            const result = await window.api.generate(text, true);
 
             if (result.success) {
                 modelData = {
@@ -147,36 +183,39 @@ document.addEventListener('DOMContentLoaded', () => {
                     obj: result.model_obj
                 };
 
-                await loadModel(result.model_glb);
+                await window.loadModel(result.model_glb);
                 refineInput.value = '';
                 showToast('Model updated!');
             } else {
-                showToast(result.message || 'Refinement failed', true);
+                showToast(result.message || 'Refinement failed');
             }
         } catch (error) {
-            showToast('Error: ' + error.message, true);
+            showToast('Error: ' + error.message);
+            console.error(error);
         }
     }
 
     // Reset everything
     function resetAll() {
         prompt.value = '';
-        refineInput.value = '';
+        if (refineInput) refineInput.value = '';
         modelData = null;
 
-        placeholder.classList.remove('hide');
-        refineField.classList.remove('show');
-        downloads.classList.remove('show');
-        dlGlb.disabled = true;
-        dlObj.disabled = true;
+        if (placeholder) placeholder.classList.remove('hide');
+        if (refineField) refineField.classList.remove('show');
+        if (downloads) downloads.classList.remove('show');
+        if (dlGlb) dlGlb.disabled = true;
+        if (dlObj) dlObj.disabled = true;
 
-        clearModel();
-        api.reset();
+        if (window.clearModel) window.clearModel();
+        if (window.api) window.api.reset();
         showToast('Canvas cleared');
     }
 
     // Loading state
     function setLoading(loading) {
+        if (!genBtn) return;
+        
         genBtn.disabled = loading;
         if (loading) {
             genBtn.textContent = 'Generating...';
@@ -188,13 +227,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Toast notification
-    function showToast(message, isError = false) {
+    function showToast(message) {
+        if (!toast || !toastText) return;
+        
         toastText.textContent = message;
-        toast.style.borderColor = isError ? '#ef4444' : 'var(--accent)';
         toast.classList.add('show');
 
         setTimeout(() => {
             toast.classList.remove('show');
         }, 3000);
     }
+
+    console.log('App initialized successfully');
 });
