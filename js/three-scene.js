@@ -1,31 +1,27 @@
-// Three.js Scene Manager with 360° Auto Rotate
+// Three.js Scene with 360° Auto Rotate
 (function() {
     'use strict';
 
     let scene, camera, renderer, controls;
     let currentModel = null;
     let gridHelper = null;
-    let wireframeMode = false;
-    let gridVisible = true;
     
-    // Auto rotate
-    let autoRotate = false;
-    let rotationSpeed = 0.01;
+    // State
+    let wireframeOn = false;
+    let gridOn = true;
+    let autoRotateOn = false;
+    let rotateSpeed = 0.01;
 
-    const ThreeScene = {
-        init: function(canvasElement) {
-            console.log('3D: Initializing scene...');
+    window.Viewer = {
+        init: function(canvas) {
+            console.log('[3D] Initializing...');
 
-            if (!canvasElement) {
-                console.error('3D: Canvas element not found!');
+            if (!canvas) {
+                console.error('[3D] No canvas!');
                 return false;
             }
 
-            const container = canvasElement.parentElement;
-            if (!container) {
-                console.error('3D: Container not found!');
-                return false;
-            }
+            const container = canvas.parentElement;
 
             try {
                 // Scene
@@ -36,18 +32,12 @@
                 const aspect = container.clientWidth / container.clientHeight || 1;
                 camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 1000);
                 camera.position.set(5, 4, 5);
-                camera.lookAt(0, 0, 0);
 
                 // Renderer
-                renderer = new THREE.WebGLRenderer({
-                    canvas: canvasElement,
-                    antialias: true,
-                    alpha: false
-                });
+                renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
                 renderer.setSize(container.clientWidth, container.clientHeight);
                 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
                 renderer.shadowMap.enabled = true;
-                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
                 // Controls
                 controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -55,101 +45,84 @@
                 controls.dampingFactor = 0.05;
                 controls.minDistance = 2;
                 controls.maxDistance = 20;
-                controls.maxPolarAngle = Math.PI * 0.9;
 
-                // Lighting
-                const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-                scene.add(ambientLight);
-
-                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-                directionalLight.position.set(5, 10, 7);
-                directionalLight.castShadow = true;
-                directionalLight.shadow.mapSize.width = 2048;
-                directionalLight.shadow.mapSize.height = 2048;
-                scene.add(directionalLight);
+                // Lights
+                scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+                
+                const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                mainLight.position.set(5, 10, 7);
+                mainLight.castShadow = true;
+                scene.add(mainLight);
 
                 const fillLight = new THREE.DirectionalLight(0x6366f1, 0.3);
                 fillLight.position.set(-5, 5, -5);
                 scene.add(fillLight);
-
-                const backLight = new THREE.DirectionalLight(0xffffff, 0.2);
-                backLight.position.set(0, 5, -10);
-                scene.add(backLight);
 
                 // Grid
                 gridHelper = new THREE.GridHelper(20, 40, 0x6366f1, 0x1a1a1f);
                 gridHelper.position.y = -0.5;
                 scene.add(gridHelper);
 
-                // Animation loop with auto-rotate
+                // Animation Loop
                 const animate = () => {
                     requestAnimationFrame(animate);
                     
-                    // Auto rotate model
-                    if (autoRotate && currentModel) {
-                        currentModel.rotation.y += rotationSpeed;
+                    // Auto rotate
+                    if (autoRotateOn && currentModel) {
+                        currentModel.rotation.y += rotateSpeed;
                     }
                     
-                    if (controls) controls.update();
-                    if (renderer && scene && camera) {
-                        renderer.render(scene, camera);
-                    }
+                    controls.update();
+                    renderer.render(scene, camera);
                 };
                 animate();
 
-                // Resize handler
-                const resizeHandler = () => {
-                    if (!container || !camera || !renderer) return;
-                    
-                    const width = container.clientWidth;
-                    const height = container.clientHeight;
-                    
-                    if (width > 0 && height > 0) {
-                        camera.aspect = width / height;
+                // Resize
+                const resize = () => {
+                    const w = container.clientWidth;
+                    const h = container.clientHeight;
+                    if (w > 0 && h > 0) {
+                        camera.aspect = w / h;
                         camera.updateProjectionMatrix();
-                        renderer.setSize(width, height);
+                        renderer.setSize(w, h);
                     }
                 };
 
-                window.addEventListener('resize', resizeHandler);
-                
-                if ('ResizeObserver' in window) {
-                    new ResizeObserver(resizeHandler).observe(container);
-                }
+                window.addEventListener('resize', resize);
+                new ResizeObserver(resize).observe(container);
 
-                console.log('✓ 3D Scene initialized');
+                console.log('[3D] Initialized');
                 return true;
 
             } catch (err) {
-                console.error('3D: Init failed', err);
+                console.error('[3D] Init error:', err);
                 return false;
             }
         },
 
         loadModel: async function(base64Data) {
-            console.log('3D: Loading model...');
+            console.log('[3D] Loading model...');
 
             return new Promise((resolve, reject) => {
                 if (!scene) {
-                    reject(new Error('Scene not initialized'));
+                    reject(new Error('Scene not ready'));
                     return;
                 }
 
-                try {
-                    this.clearModel();
+                // Clear old model
+                this.clearModel();
 
-                    const binaryString = atob(base64Data);
-                    const bytes = new Uint8Array(binaryString.length);
-                    for (let i = 0; i < binaryString.length; i++) {
-                        bytes[i] = binaryString.charCodeAt(i);
+                try {
+                    const binary = atob(base64Data);
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++) {
+                        bytes[i] = binary.charCodeAt(i);
                     }
 
                     const blob = new Blob([bytes.buffer], { type: 'model/gltf-binary' });
                     const url = URL.createObjectURL(blob);
 
-                    const loader = new THREE.GLTFLoader();
-                    
-                    loader.load(
+                    new THREE.GLTFLoader().load(
                         url,
                         (gltf) => {
                             currentModel = gltf.scene;
@@ -158,54 +131,50 @@
                                 if (child.isMesh) {
                                     child.castShadow = true;
                                     child.receiveShadow = true;
-                                    
                                     if (child.material) {
                                         child.material.side = THREE.DoubleSide;
-                                        child.material.wireframe = wireframeMode;
+                                        child.material.wireframe = wireframeOn;
                                     }
                                 }
                             });
 
-                            // Center model
+                            // Center
                             const box = new THREE.Box3().setFromObject(currentModel);
                             const center = box.getCenter(new THREE.Vector3());
                             currentModel.position.sub(center);
                             currentModel.position.y = 0;
 
-                            // Scale to fit view
+                            // Scale
                             const size = box.getSize(new THREE.Vector3());
                             const maxDim = Math.max(size.x, size.y, size.z);
                             if (maxDim > 4) {
-                                const scale = 4 / maxDim;
-                                currentModel.scale.multiplyScalar(scale);
+                                currentModel.scale.multiplyScalar(4 / maxDim);
                             }
 
                             scene.add(currentModel);
                             this.resetCamera();
 
                             URL.revokeObjectURL(url);
-                            console.log('✓ Model loaded');
+                            console.log('[3D] Model loaded');
                             resolve();
                         },
                         undefined,
-                        (error) => {
+                        (err) => {
                             URL.revokeObjectURL(url);
-                            console.error('3D: Load failed', error);
-                            reject(error);
+                            console.error('[3D] Load error:', err);
+                            reject(err);
                         }
                     );
-
                 } catch (err) {
-                    console.error('3D: Processing failed', err);
+                    console.error('[3D] Process error:', err);
                     reject(err);
                 }
             });
         },
 
         clearModel: function() {
-            if (currentModel && scene) {
+            if (currentModel) {
                 scene.remove(currentModel);
-                
                 currentModel.traverse((child) => {
                     if (child.isMesh) {
                         if (child.geometry) child.geometry.dispose();
@@ -218,9 +187,8 @@
                         }
                     }
                 });
-                
                 currentModel = null;
-                console.log('3D: Model cleared');
+                console.log('[3D] Model cleared');
             }
         },
 
@@ -229,54 +197,45 @@
                 camera.position.set(5, 4, 5);
                 camera.lookAt(0, 0, 0);
                 controls.reset();
-                console.log('3D: Camera reset');
             }
         },
 
         toggleWireframe: function() {
-            wireframeMode = !wireframeMode;
-            
+            wireframeOn = !wireframeOn;
             if (currentModel) {
                 currentModel.traverse((child) => {
                     if (child.isMesh && child.material) {
-                        child.material.wireframe = wireframeMode;
+                        child.material.wireframe = wireframeOn;
                     }
                 });
             }
-            
-            console.log('3D: Wireframe', wireframeMode ? 'ON' : 'OFF');
-            return wireframeMode;
+            console.log('[3D] Wireframe:', wireframeOn);
+            return wireframeOn;
         },
 
         toggleGrid: function() {
-            gridVisible = !gridVisible;
-            
-            if (gridHelper) {
-                gridHelper.visible = gridVisible;
-            }
-            
-            console.log('3D: Grid', gridVisible ? 'ON' : 'OFF');
-            return gridVisible;
+            gridOn = !gridOn;
+            if (gridHelper) gridHelper.visible = gridOn;
+            console.log('[3D] Grid:', gridOn);
+            return gridOn;
         },
 
-        // 360° Auto Rotate Feature
         toggleAutoRotate: function() {
-            autoRotate = !autoRotate;
-            console.log('3D: Auto-rotate', autoRotate ? 'ON' : 'OFF');
-            return autoRotate;
+            autoRotateOn = !autoRotateOn;
+            console.log('[3D] Auto-rotate:', autoRotateOn);
+            return autoRotateOn;
         },
 
-        setRotationSpeed: function(speed) {
-            // speed: 1-10, map to 0.005 - 0.05
-            rotationSpeed = 0.003 + (speed / 10) * 0.047;
-            console.log('3D: Rotation speed set to', rotationSpeed.toFixed(4));
+        setRotateSpeed: function(speed) {
+            // speed 1-10 maps to 0.005 - 0.05
+            rotateSpeed = 0.003 + (speed / 10) * 0.047;
+            console.log('[3D] Rotate speed:', rotateSpeed.toFixed(4));
         },
 
-        isAutoRotating: function() {
-            return autoRotate;
+        isRotating: function() {
+            return autoRotateOn;
         }
     };
 
-    window.ThreeScene = ThreeScene;
-    console.log('✓ Three.js Scene Manager loaded');
+    console.log('[3D] Module loaded');
 })();
