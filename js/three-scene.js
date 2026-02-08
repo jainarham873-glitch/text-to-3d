@@ -1,8 +1,15 @@
+// Global Three.js scene variables
 let scene, camera, renderer, controls, model, grid;
 let isWireframe = false;
 let showGridFlag = true;
 
-function initScene(canvas) {
+// Initialize the 3D scene
+window.initScene = function(canvas) {
+    if (!canvas) {
+        console.error('Canvas element not found');
+        return;
+    }
+
     const container = canvas.parentElement;
 
     // Scene
@@ -15,7 +22,10 @@ function initScene(canvas) {
     camera.position.set(3, 2.5, 3);
 
     // Renderer
-    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    renderer = new THREE.WebGLRenderer({ 
+        canvas: canvas, 
+        antialias: true 
+    });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
@@ -48,8 +58,10 @@ function initScene(canvas) {
     // Animation loop
     function animate() {
         requestAnimationFrame(animate);
-        controls.update();
-        renderer.render(scene, camera);
+        if (controls) controls.update();
+        if (renderer && scene && camera) {
+            renderer.render(scene, camera);
+        }
     }
     animate();
 
@@ -57,7 +69,7 @@ function initScene(canvas) {
     function onResize() {
         const width = container.clientWidth;
         const height = container.clientHeight;
-        if (width && height) {
+        if (width && height && camera && renderer) {
             camera.aspect = width / height;
             camera.updateProjectionMatrix();
             renderer.setSize(width, height);
@@ -65,13 +77,21 @@ function initScene(canvas) {
     }
 
     window.addEventListener('resize', onResize);
-    new ResizeObserver(onResize).observe(container);
-}
+    
+    try {
+        new ResizeObserver(onResize).observe(container);
+    } catch (e) {
+        console.warn('ResizeObserver not supported');
+    }
 
-async function loadModel(base64Data) {
+    console.log('Three.js scene initialized');
+};
+
+// Load 3D model from base64
+window.loadModel = async function(base64Data) {
     return new Promise((resolve, reject) => {
         // Clear existing model
-        clearModel();
+        window.clearModel();
 
         try {
             const binary = atob(base64Data);
@@ -113,25 +133,29 @@ async function loadModel(base64Data) {
                     }
 
                     scene.add(model);
-                    resetCamera();
+                    window.resetCamera();
 
                     URL.revokeObjectURL(url);
+                    console.log('Model loaded successfully');
                     resolve();
                 },
                 undefined,
                 (error) => {
                     URL.revokeObjectURL(url);
+                    console.error('Model loading error:', error);
                     reject(error);
                 }
             );
         } catch (error) {
+            console.error('Model processing error:', error);
             reject(error);
         }
     });
-}
+};
 
-function clearModel() {
-    if (model) {
+// Clear current model
+window.clearModel = function() {
+    if (model && scene) {
         scene.remove(model);
         model.traverse((child) => {
             if (child.isMesh) {
@@ -147,15 +171,19 @@ function clearModel() {
         });
         model = null;
     }
-}
+};
 
-function resetCamera() {
-    camera.position.set(3, 2.5, 3);
-    camera.lookAt(0, 0, 0);
-    controls.reset();
-}
+// Reset camera position
+window.resetCamera = function() {
+    if (camera && controls) {
+        camera.position.set(3, 2.5, 3);
+        camera.lookAt(0, 0, 0);
+        controls.reset();
+    }
+};
 
-function toggleWire() {
+// Toggle wireframe mode
+window.toggleWire = function() {
     isWireframe = !isWireframe;
     if (model) {
         model.traverse((child) => {
@@ -165,12 +193,15 @@ function toggleWire() {
         });
     }
     return isWireframe;
-}
+};
 
-function toggleGrid() {
+// Toggle grid visibility
+window.toggleGrid = function() {
     showGridFlag = !showGridFlag;
     if (grid) {
         grid.visible = showGridFlag;
     }
     return showGridFlag;
-}
+};
+
+console.log('three-scene.js loaded');
