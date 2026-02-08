@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Three.js - Load FIRST -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -31,29 +30,29 @@
                 <div class="sidebar-top">
                     <div class="field">
                         <label>AI Generation Prompt</label>
-                        <textarea id="prompt" placeholder="Describe your 3D model..." rows="4"></textarea>
+                        <textarea id="prompt" placeholder="Try: 3 red cubes, 5 blue spheres..." rows="4"></textarea>
                     </div>
 
                     <div class="field">
                         <label>Presets</label>
                         <div class="tags">
-                            <span class="tag" data-p="red cube with smooth edges">🟥 Red Cube</span>
-                            <span class="tag" data-p="blue metallic sphere">🔵 Blue Sphere</span>
-                            <span class="tag" data-p="green cylinder">🟢 Cylinder</span>
-                            <span class="tag" data-p="golden torus ring">🍩 Torus</span>
-                            <span class="tag" data-p="purple pyramid">🔺 Pyramid</span>
-                            <span class="tag" data-p="silver cone">⚪ Cone</span>
+                            <span class="tag" data-p="3 red cubes">🟥 3 Cubes</span>
+                            <span class="tag" data-p="5 blue spheres">🔵 5 Spheres</span>
+                            <span class="tag" data-p="4 green cylinders">🟢 4 Cylinders</span>
+                            <span class="tag" data-p="golden torus">🍩 Torus</span>
+                            <span class="tag" data-p="2 purple pyramids">🔺 2 Pyramids</span>
+                            <span class="tag" data-p="large silver cone">⚪ Cone</span>
                         </div>
                     </div>
 
                     <button class="btn-primary" id="gen-btn">
                         <span id="btn-text">Generate Model</span>
-                        <span id="btn-loading" style="display:none;">●●●</span>
+                        <span id="btn-loading" style="display:none;">Generating...</span>
                     </button>
 
                     <div id="refine-field" class="field refine-area">
                         <label>Iterate & Refine</label>
-                        <textarea id="refine" placeholder="Make it bigger, change color..." rows="2"></textarea>
+                        <textarea id="refine" placeholder="Make it bigger, change color to blue..." rows="2"></textarea>
                         <button class="btn-secondary" id="refine-btn">Apply Changes</button>
                     </div>
                 </div>
@@ -61,8 +60,8 @@
                 <div id="downloads" class="downloads">
                     <label>Export Assets</label>
                     <div class="dl-group">
-                        <button class="dl-btn" id="dl-glb" disabled>Download GLB</button>
-                        <button class="dl-btn" id="dl-obj" disabled>Download OBJ</button>
+                        <button class="dl-btn" id="dl-glb" disabled>GLB</button>
+                        <button class="dl-btn" id="dl-obj" disabled>OBJ</button>
                     </div>
                 </div>
             </aside>
@@ -73,12 +72,19 @@
                     <div class="placeholder" id="placeholder">
                         <div class="p-icon">✦</div>
                         <p>Enter a prompt to generate 3D mesh</p>
+                        <span class="hint">Try: "3 red cubes" or "5 blue spheres"</span>
                     </div>
 
                     <div class="toolbar">
-                        <button class="tool" id="reset-btn">Reset</button>
-                        <button class="tool" id="wire-btn">Wireframe</button>
-                        <button class="tool active" id="grid-btn">Grid</button>
+                        <button class="tool" id="rotate-btn" title="Auto Rotate 360°">360°</button>
+                        <button class="tool" id="reset-btn" title="Reset View">Reset</button>
+                        <button class="tool" id="wire-btn" title="Wireframe">Wire</button>
+                        <button class="tool active" id="grid-btn" title="Toggle Grid">Grid</button>
+                    </div>
+                    
+                    <div class="speed-control" id="speed-control" style="display:none;">
+                        <label>Rotation Speed</label>
+                        <input type="range" id="speed-slider" min="1" max="10" value="3">
                     </div>
                 </div>
             </section>
@@ -89,7 +95,6 @@
         <span id="toast-text"></span>
     </div>
 
-    <!-- Scripts in CORRECT order -->
     <script src="js/api-client.js"></script>
     <script src="js/three-scene.js"></script>
     <script src="js/app.js"></script>
