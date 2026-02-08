@@ -1,242 +1,298 @@
-console.log('app.js loading...');
+// Main Application - Must load LAST
+(function() {
+    'use strict';
 
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM loaded, initializing app...');
+    console.log('App: Starting initialization...');
 
-    // Get elements
-    const prompt = document.getElementById('prompt');
-    const genBtn = document.getElementById('gen-btn');
-    const refineField = document.getElementById('refine-field');
-    const refineInput = document.getElementById('refine');
-    const refineBtn = document.getElementById('refine-btn');
-    const placeholder = document.getElementById('placeholder');
-    const downloads = document.getElementById('downloads');
-    const dlGlb = document.getElementById('dl-glb');
-    const dlObj = document.getElementById('dl-obj');
-    const toast = document.getElementById('toast');
-    const toastText = document.getElementById('toast-text');
-    const newBtn = document.getElementById('new-btn');
-    const resetBtn = document.getElementById('reset-btn');
-    const wireBtn = document.getElementById('wire-btn');
-    const gridBtn = document.getElementById('grid-btn');
-    const tags = document.querySelectorAll('.tag');
-
-    // Check if elements exist
-    if (!prompt || !genBtn) {
-        console.error('Required elements not found!');
-        return;
-    }
-
-    let modelData = null;
-
-    // Initialize Three.js scene
-    const canvas = document.getElementById('canvas');
-    if (canvas && window.initScene) {
-        window.initScene(canvas);
+    // Wait for DOM
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initApp);
     } else {
-        console.error('Canvas or initScene not found');
+        initApp();
     }
 
-    // Check backend connection
-    if (window.api) {
-        window.api.health()
-            .then(() => console.log('Backend connected'))
-            .catch(() => showToast('Cannot connect to server'));
-    }
+    function initApp() {
+        console.log('App: DOM ready, initializing...');
 
-    // Tag presets click
-    tags.forEach(tag => {
-        tag.addEventListener('click', () => {
-            prompt.value = tag.dataset.p;
-            prompt.focus();
-        });
-    });
-
-    // Generate button
-    genBtn.addEventListener('click', generate);
-
-    // Enter key to generate
-    prompt.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            generate();
+        // Check dependencies
+        if (!window.API) {
+            console.error('App: API not loaded!');
+            return;
         }
-    });
+        if (!window.ThreeScene) {
+            console.error('App: ThreeScene not loaded!');
+            return;
+        }
+        if (!window.THREE) {
+            console.error('App: Three.js not loaded!');
+            return;
+        }
 
-    // Refine button
-    if (refineBtn) {
-        refineBtn.addEventListener('click', refine);
-    }
+        // Get DOM elements
+        const elements = {
+            prompt: document.getElementById('prompt'),
+            genBtn: document.getElementById('gen-btn'),
+            btnText: document.getElementById('btn-text'),
+            btnLoading: document.getElementById('btn-loading'),
+            refineField: document.getElementById('refine-field'),
+            refineInput: document.getElementById('refine'),
+            refineBtn: document.getElementById('refine-btn'),
+            placeholder: document.getElementById('placeholder'),
+            downloads: document.getElementById('downloads'),
+            dlGlb: document.getElementById('dl-glb'),
+            dlObj: document.getElementById('dl-obj'),
+            toast: document.getElementById('toast'),
+            toastText: document.getElementById('toast-text'),
+            newBtn: document.getElementById('new-btn'),
+            resetBtn: document.getElementById('reset-btn'),
+            wireBtn: document.getElementById('wire-btn'),
+            gridBtn: document.getElementById('grid-btn'),
+            canvas: document.getElementById('canvas'),
+            tags: document.querySelectorAll('.tag')
+        };
 
-    // Enter key to refine
-    if (refineInput) {
-        refineInput.addEventListener('keydown', (e) => {
+        // Validate required elements
+        const required = ['prompt', 'genBtn', 'canvas'];
+        for (let key of required) {
+            if (!elements[key]) {
+                console.error(`App: Required element '${key}' not found!`);
+                return;
+            }
+        }
+
+        // State
+        let modelData = null;
+
+        // Initialize 3D scene
+        const sceneInitialized = window.ThreeScene.init(elements.canvas);
+        if (!sceneInitialized) {
+            console.error('App: Failed to initialize 3D scene');
+            showToast('Failed to initialize 3D viewer');
+            return;
+        }
+
+        // Check backend
+        window.API.checkHealth()
+            .then(() => {
+                console.log('App: Backend connected');
+            })
+            .catch((err) => {
+                console.warn('App: Backend not available', err);
+                showToast('Backend not available - offline mode');
+            });
+
+        // Event Listeners
+
+        // Tags/Presets
+        elements.tags.forEach(tag => {
+            tag.addEventListener('click', () => {
+                elements.prompt.value = tag.dataset.p;
+                elements.prompt.focus();
+            });
+        });
+
+        // Generate button
+        elements.genBtn.addEventListener('click', handleGenerate);
+
+        // Enter to generate
+        elements.prompt.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                refine();
+                handleGenerate();
             }
         });
-    }
 
-    // New/Clear button
-    if (newBtn) {
-        newBtn.addEventListener('click', resetAll);
-    }
-
-    // Viewer controls
-    if (resetBtn) {
-        resetBtn.addEventListener('click', () => {
-            if (window.resetCamera) window.resetCamera();
-        });
-    }
-
-    if (wireBtn) {
-        wireBtn.addEventListener('click', () => {
-            if (window.toggleWire) {
-                const active = window.toggleWire();
-                wireBtn.classList.toggle('active', active);
-            }
-        });
-    }
-
-    if (gridBtn) {
-        gridBtn.addEventListener('click', () => {
-            if (window.toggleGrid) {
-                const active = window.toggleGrid();
-                gridBtn.classList.toggle('active', active);
-            }
-        });
-    }
-
-    // Download buttons
-    if (dlGlb) {
-        dlGlb.addEventListener('click', () => {
-            if (modelData?.glb && window.api) {
-                window.api.download(modelData.glb, 'model.glb', 'model/gltf-binary');
-                showToast('GLB downloaded!');
-            }
-        });
-    }
-
-    if (dlObj) {
-        dlObj.addEventListener('click', () => {
-            if (modelData?.obj && window.api) {
-                window.api.download(modelData.obj, 'model.obj', 'text/plain');
-                showToast('OBJ downloaded!');
-            }
-        });
-    }
-
-    // Generate function
-    async function generate() {
-        const text = prompt.value.trim();
-        if (!text) {
-            showToast('Please enter a prompt');
-            return;
+        // Refine button
+        if (elements.refineBtn) {
+            elements.refineBtn.addEventListener('click', handleRefine);
         }
 
-        setLoading(true);
+        // Enter to refine
+        if (elements.refineInput) {
+            elements.refineInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleRefine();
+                }
+            });
+        }
 
-        try {
-            const result = await window.api.generate(text, false);
+        // New/Clear button
+        if (elements.newBtn) {
+            elements.newBtn.addEventListener('click', handleReset);
+        }
 
-            if (result.success) {
-                modelData = {
-                    glb: result.model_glb,
-                    obj: result.model_obj
-                };
+        // Viewer controls
+        if (elements.resetBtn) {
+            elements.resetBtn.addEventListener('click', () => {
+                window.ThreeScene.resetCamera();
+            });
+        }
 
-                await window.loadModel(result.model_glb);
+        if (elements.wireBtn) {
+            elements.wireBtn.addEventListener('click', () => {
+                const active = window.ThreeScene.toggleWireframe();
+                elements.wireBtn.classList.toggle('active', active);
+            });
+        }
 
-                if (placeholder) placeholder.classList.add('hide');
-                if (refineField) refineField.classList.add('show');
-                if (downloads) downloads.classList.add('show');
-                if (dlGlb) dlGlb.disabled = false;
-                if (dlObj) dlObj.disabled = false;
+        if (elements.gridBtn) {
+            elements.gridBtn.addEventListener('click', () => {
+                const active = window.ThreeScene.toggleGrid();
+                elements.gridBtn.classList.toggle('active', active);
+            });
+        }
 
-                showToast('Model generated successfully!');
+        // Download buttons
+        if (elements.dlGlb) {
+            elements.dlGlb.addEventListener('click', () => {
+                if (modelData?.glb) {
+                    try {
+                        window.API.downloadFile(modelData.glb, 'lumina-model.glb', 'model/gltf-binary');
+                        showToast('GLB downloaded successfully!');
+                    } catch (err) {
+                        showToast('Download failed: ' + err.message);
+                    }
+                }
+            });
+        }
+
+        if (elements.dlObj) {
+            elements.dlObj.addEventListener('click', () => {
+                if (modelData?.obj) {
+                    try {
+                        window.API.downloadFile(modelData.obj, 'lumina-model.obj', 'text/plain');
+                        showToast('OBJ downloaded successfully!');
+                    } catch (err) {
+                        showToast('Download failed: ' + err.message);
+                    }
+                }
+            });
+        }
+
+        // Functions
+
+        async function handleGenerate() {
+            const prompt = elements.prompt.value.trim();
+            
+            if (!prompt) {
+                showToast('Please enter a prompt');
+                return;
+            }
+
+            setLoading(true);
+
+            try {
+                console.log('App: Generating model...');
+                const result = await window.API.generate(prompt, false);
+
+                if (result.success) {
+                    modelData = {
+                        glb: result.model_glb,
+                        obj: result.model_obj
+                    };
+
+                    await window.ThreeScene.loadModel(result.model_glb);
+
+                    // Update UI
+                    if (elements.placeholder) elements.placeholder.classList.add('hide');
+                    if (elements.refineField) elements.refineField.classList.add('show');
+                    if (elements.downloads) elements.downloads.classList.add('show');
+                    if (elements.dlGlb) elements.dlGlb.disabled = false;
+                    if (elements.dlObj) elements.dlObj.disabled = false;
+
+                    showToast('✓ Model generated successfully!');
+                } else {
+                    showToast('Generation failed: ' + (result.message || 'Unknown error'));
+                }
+            } catch (err) {
+                console.error('App: Generation error', err);
+                showToast('Error: ' + err.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function handleRefine() {
+            const prompt = elements.refineInput.value.trim();
+            
+            if (!prompt) {
+                showToast('Enter refinement instructions');
+                return;
+            }
+
+            try {
+                console.log('App: Refining model...');
+                const result = await window.API.generate(prompt, true);
+
+                if (result.success) {
+                    modelData = {
+                        glb: result.model_glb,
+                        obj: result.model_obj
+                    };
+
+                    await window.ThreeScene.loadModel(result.model_glb);
+                    elements.refineInput.value = '';
+
+                    showToast('✓ Model refined!');
+                } else {
+                    showToast('Refinement failed: ' + (result.message || 'Unknown error'));
+                }
+            } catch (err) {
+                console.error('App: Refinement error', err);
+                showToast('Error: ' + err.message);
+            }
+        }
+
+        function handleReset() {
+            console.log('App: Resetting...');
+            
+            elements.prompt.value = '';
+            if (elements.refineInput) elements.refineInput.value = '';
+            
+            modelData = null;
+
+            if (elements.placeholder) elements.placeholder.classList.remove('hide');
+            if (elements.refineField) elements.refineField.classList.remove('show');
+            if (elements.downloads) elements.downloads.classList.remove('show');
+            if (elements.dlGlb) elements.dlGlb.disabled = true;
+            if (elements.dlObj) elements.dlObj.disabled = true;
+
+            window.ThreeScene.clearModel();
+            window.API.resetSession();
+
+            showToast('Canvas cleared');
+        }
+
+        function setLoading(loading) {
+            if (!elements.genBtn) return;
+
+            elements.genBtn.disabled = loading;
+            
+            if (elements.btnText && elements.btnLoading) {
+                if (loading) {
+                    elements.btnText.style.display = 'none';
+                    elements.btnLoading.style.display = 'inline';
+                } else {
+                    elements.btnText.style.display = 'inline';
+                    elements.btnLoading.style.display = 'none';
+                }
             } else {
-                showToast(result.message || 'Generation failed');
+                elements.genBtn.textContent = loading ? 'Generating...' : 'Generate Model';
             }
-        } catch (error) {
-            showToast('Error: ' + error.message);
-            console.error(error);
         }
 
-        setLoading(false);
-    }
+        function showToast(message) {
+            if (!elements.toast || !elements.toastText) return;
 
-    // Refine function
-    async function refine() {
-        const text = refineInput.value.trim();
-        if (!text) {
-            showToast('Enter refinement details');
-            return;
+            elements.toastText.textContent = message;
+            elements.toast.classList.add('show');
+
+            setTimeout(() => {
+                elements.toast.classList.remove('show');
+            }, 3000);
         }
 
-        try {
-            const result = await window.api.generate(text, true);
-
-            if (result.success) {
-                modelData = {
-                    glb: result.model_glb,
-                    obj: result.model_obj
-                };
-
-                await window.loadModel(result.model_glb);
-                refineInput.value = '';
-                showToast('Model updated!');
-            } else {
-                showToast(result.message || 'Refinement failed');
-            }
-        } catch (error) {
-            showToast('Error: ' + error.message);
-            console.error(error);
-        }
+        console.log('✓ App initialized successfully');
     }
-
-    // Reset everything
-    function resetAll() {
-        prompt.value = '';
-        if (refineInput) refineInput.value = '';
-        modelData = null;
-
-        if (placeholder) placeholder.classList.remove('hide');
-        if (refineField) refineField.classList.remove('show');
-        if (downloads) downloads.classList.remove('show');
-        if (dlGlb) dlGlb.disabled = true;
-        if (dlObj) dlObj.disabled = true;
-
-        if (window.clearModel) window.clearModel();
-        if (window.api) window.api.reset();
-        showToast('Canvas cleared');
-    }
-
-    // Loading state
-    function setLoading(loading) {
-        if (!genBtn) return;
-        
-        genBtn.disabled = loading;
-        if (loading) {
-            genBtn.textContent = 'Generating...';
-            genBtn.style.opacity = '0.7';
-        } else {
-            genBtn.textContent = 'Generate Model';
-            genBtn.style.opacity = '1';
-        }
-    }
-
-    // Toast notification
-    function showToast(message) {
-        if (!toast || !toastText) return;
-        
-        toastText.textContent = message;
-        toast.classList.add('show');
-
-        setTimeout(() => {
-            toast.classList.remove('show');
-        }, 3000);
-    }
-
-    console.log('App initialized successfully');
-});
+})();
