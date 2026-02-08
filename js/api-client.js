@@ -1,70 +1,69 @@
-// API Client - Must load FIRST
+// API Client
 (function() {
     'use strict';
     
-    const API = {
+    window.API = {
         baseUrl: (function() {
-            const host = window.location.hostname;
-            if (host === 'localhost' || host === '127.0.0.1') {
+            const h = window.location.hostname;
+            if (h === 'localhost' || h === '127.0.0.1') {
                 return 'http://localhost:7860';
             }
             return 'https://jainarham-text-to-3d.hf.space';
         })(),
 
         sessionId: (function() {
-            let id = localStorage.getItem('lumina_session');
+            let id = localStorage.getItem('lumina_sid');
             if (!id) {
-                id = 'sess_' + Math.random().toString(36).substr(2, 9) + Date.now();
-                localStorage.setItem('lumina_session', id);
+                id = 'sid_' + Math.random().toString(36).substr(2, 12);
+                localStorage.setItem('lumina_sid', id);
             }
             return id;
         })(),
 
-        async generate(prompt, isRefinement = false) {
-            console.log('API: Generating with prompt:', prompt);
+        generate: async function(prompt, isRefinement) {
+            console.log('[API] Generating:', prompt, 'Refine:', isRefinement);
             
-            const response = await fetch(this.baseUrl + '/generate', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    prompt: prompt,
-                    session_id: this.sessionId,
-                    is_refinement: isRefinement
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-            console.log('API: Response received', data.success ? 'SUCCESS' : 'FAILED');
-            return data;
-        },
-
-        async checkHealth() {
             try {
-                const response = await fetch(this.baseUrl + '/health');
+                const response = await fetch(this.baseUrl + '/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        session_id: this.sessionId,
+                        is_refinement: isRefinement === true
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Server returned ' + response.status);
+                }
+
                 const data = await response.json();
-                console.log('API: Backend health:', data);
+                console.log('[API] Response:', data.success ? 'OK' : 'FAIL');
                 return data;
+                
             } catch (err) {
-                console.error('API: Health check failed', err);
+                console.error('[API] Error:', err);
                 throw err;
             }
         },
 
-        downloadFile(base64Data, filename, mimeType) {
-            console.log('API: Downloading', filename);
-            
+        checkHealth: async function() {
             try {
-                const binaryString = atob(base64Data);
-                const bytes = new Uint8Array(binaryString.length);
-                
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
+                const res = await fetch(this.baseUrl + '/health');
+                return await res.json();
+            } catch (err) {
+                console.error('[API] Health check failed');
+                throw err;
+            }
+        },
+
+        download: function(base64Data, filename, mimeType) {
+            try {
+                const binary = atob(base64Data);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
                 }
                 
                 const blob = new Blob([bytes], { type: mimeType });
@@ -78,20 +77,18 @@
                 document.body.removeChild(a);
                 
                 URL.revokeObjectURL(url);
-                console.log('API: Download complete');
+                console.log('[API] Downloaded:', filename);
             } catch (err) {
-                console.error('API: Download failed', err);
-                throw err;
+                console.error('[API] Download failed:', err);
             }
         },
 
-        resetSession() {
-            this.sessionId = 'sess_' + Math.random().toString(36).substr(2, 9) + Date.now();
-            localStorage.setItem('lumina_session', this.sessionId);
-            console.log('API: Session reset');
+        resetSession: function() {
+            this.sessionId = 'sid_' + Math.random().toString(36).substr(2, 12);
+            localStorage.setItem('lumina_sid', this.sessionId);
+            console.log('[API] Session reset');
         }
     };
 
-    window.API = API;
-    console.log('✓ API Client loaded');
+    console.log('[API] Loaded. Base:', window.API.baseUrl);
 })();
