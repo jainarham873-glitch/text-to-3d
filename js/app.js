@@ -1,98 +1,97 @@
-// Main Application with 360° Auto Rotate Support
+// Main App
 (function() {
     'use strict';
 
-    console.log('App: Starting...');
+    console.log('[App] Starting...');
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initApp);
-    } else {
-        initApp();
-    }
-
-    function initApp() {
-        console.log('App: DOM ready');
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('[App] DOM ready');
 
         // Check dependencies
         if (!window.API) {
-            console.error('App: API not loaded!');
+            console.error('[App] API missing!');
             return;
         }
-        if (!window.ThreeScene) {
-            console.error('App: ThreeScene not loaded!');
+        if (!window.Viewer) {
+            console.error('[App] Viewer missing!');
             return;
         }
 
-        // Get elements
-        const elements = {
-            prompt: document.getElementById('prompt'),
-            genBtn: document.getElementById('gen-btn'),
-            btnText: document.getElementById('btn-text'),
-            btnLoading: document.getElementById('btn-loading'),
-            refineField: document.getElementById('refine-field'),
-            refineInput: document.getElementById('refine'),
-            refineBtn: document.getElementById('refine-btn'),
-            placeholder: document.getElementById('placeholder'),
-            downloads: document.getElementById('downloads'),
-            dlGlb: document.getElementById('dl-glb'),
-            dlObj: document.getElementById('dl-obj'),
-            toast: document.getElementById('toast'),
-            toastText: document.getElementById('toast-text'),
-            newBtn: document.getElementById('new-btn'),
-            resetBtn: document.getElementById('reset-btn'),
-            wireBtn: document.getElementById('wire-btn'),
-            gridBtn: document.getElementById('grid-btn'),
-            rotateBtn: document.getElementById('rotate-btn'),
-            speedControl: document.getElementById('speed-control'),
-            speedSlider: document.getElementById('speed-slider'),
-            canvas: document.getElementById('canvas'),
-            tags: document.querySelectorAll('.tag')
-        };
+        // Elements
+        const $ = (id) => document.getElementById(id);
+        
+        const prompt = $('prompt');
+        const genBtn = $('gen-btn');
+        const btnText = $('btn-text');
+        const btnLoading = $('btn-loading');
+        const refineSection = $('refine-section');
+        const refineInput = $('refine-input');
+        const refineBtn = $('refine-btn');
+        const placeholder = $('placeholder');
+        const downloadSection = $('download-section');
+        const dlGlb = $('dl-glb');
+        const dlObj = $('dl-obj');
+        const toast = $('toast');
+        const toastText = $('toast-text');
+        const newBtn = $('new-btn');
+        const resetViewBtn = $('reset-view-btn');
+        const wireframeBtn = $('wireframe-btn');
+        const gridBtn = $('grid-btn');
+        const autoRotateBtn = $('auto-rotate-btn');
+        const speedSliderContainer = $('speed-slider-container');
+        const speedSlider = $('speed-slider');
+        const speedValue = $('speed-value');
+        const canvas = $('canvas');
+        const tags = document.querySelectorAll('.tag');
 
-        // Validate
-        if (!elements.prompt || !elements.genBtn || !elements.canvas) {
-            console.error('App: Required elements missing!');
+        // Check required elements
+        if (!prompt || !genBtn || !canvas) {
+            console.error('[App] Missing required elements!');
             return;
         }
 
         let modelData = null;
 
-        // Init 3D
-        if (!window.ThreeScene.init(elements.canvas)) {
-            showToast('Failed to initialize 3D viewer');
+        // Init 3D Viewer
+        if (!window.Viewer.init(canvas)) {
+            showToast('Failed to init 3D viewer', 'error');
             return;
         }
 
-        // Check backend
+        // Check API
         window.API.checkHealth()
-            .then(() => console.log('App: Backend connected'))
-            .catch(() => showToast('Backend offline'));
+            .then(() => console.log('[App] API connected'))
+            .catch(() => showToast('Server offline', 'error'));
 
-        // --- Event Listeners ---
+        // --- EVENT LISTENERS ---
 
-        // Tags
-        elements.tags.forEach(tag => {
-            tag.addEventListener('click', () => {
-                elements.prompt.value = tag.dataset.p;
-                elements.prompt.focus();
+        // Tags/Presets
+        tags.forEach(function(tag) {
+            tag.addEventListener('click', function() {
+                prompt.value = this.getAttribute('data-p');
+                prompt.focus();
             });
         });
 
-        // Generate
-        elements.genBtn.addEventListener('click', handleGenerate);
-        elements.prompt.addEventListener('keydown', (e) => {
+        // Generate Button
+        genBtn.addEventListener('click', handleGenerate);
+
+        // Enter to generate
+        prompt.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleGenerate();
             }
         });
 
-        // Refine
-        if (elements.refineBtn) {
-            elements.refineBtn.addEventListener('click', handleRefine);
+        // Refine Button
+        if (refineBtn) {
+            refineBtn.addEventListener('click', handleRefine);
         }
-        if (elements.refineInput) {
-            elements.refineInput.addEventListener('keydown', (e) => {
+
+        // Enter to refine
+        if (refineInput) {
+            refineInput.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     handleRefine();
@@ -100,91 +99,96 @@
             });
         }
 
-        // New/Reset
-        if (elements.newBtn) {
-            elements.newBtn.addEventListener('click', handleReset);
+        // New/Clear Button
+        if (newBtn) {
+            newBtn.addEventListener('click', handleReset);
         }
 
-        // Camera Reset
-        if (elements.resetBtn) {
-            elements.resetBtn.addEventListener('click', () => {
-                window.ThreeScene.resetCamera();
+        // Reset View Button
+        if (resetViewBtn) {
+            resetViewBtn.addEventListener('click', function() {
+                window.Viewer.resetCamera();
                 showToast('View reset');
             });
         }
 
-        // Wireframe
-        if (elements.wireBtn) {
-            elements.wireBtn.addEventListener('click', () => {
-                const active = window.ThreeScene.toggleWireframe();
-                elements.wireBtn.classList.toggle('active', active);
+        // Wireframe Button
+        if (wireframeBtn) {
+            wireframeBtn.addEventListener('click', function() {
+                const active = window.Viewer.toggleWireframe();
+                this.classList.toggle('active', active);
                 showToast(active ? 'Wireframe ON' : 'Wireframe OFF');
             });
         }
 
-        // Grid
-        if (elements.gridBtn) {
-            elements.gridBtn.addEventListener('click', () => {
-                const active = window.ThreeScene.toggleGrid();
-                elements.gridBtn.classList.toggle('active', active);
+        // Grid Button
+        if (gridBtn) {
+            gridBtn.addEventListener('click', function() {
+                const active = window.Viewer.toggleGrid();
+                this.classList.toggle('active', active);
             });
         }
 
-        // 360° Auto Rotate
-        if (elements.rotateBtn) {
-            elements.rotateBtn.addEventListener('click', () => {
-                const active = window.ThreeScene.toggleAutoRotate();
-                elements.rotateBtn.classList.toggle('active', active);
+        // 360° Auto Rotate Button
+        if (autoRotateBtn) {
+            autoRotateBtn.addEventListener('click', function() {
+                console.log('[App] 360 button clicked');
+                const active = window.Viewer.toggleAutoRotate();
+                this.classList.toggle('active', active);
                 
-                // Show/hide speed control
-                if (elements.speedControl) {
-                    elements.speedControl.style.display = active ? 'flex' : 'none';
+                // Show/hide speed slider
+                if (speedSliderContainer) {
+                    speedSliderContainer.classList.toggle('visible', active);
                 }
                 
                 showToast(active ? '360° Rotate ON' : '360° Rotate OFF');
             });
         }
 
-        // Speed slider
-        if (elements.speedSlider) {
-            elements.speedSlider.addEventListener('input', (e) => {
-                window.ThreeScene.setRotationSpeed(parseInt(e.target.value));
+        // Speed Slider
+        if (speedSlider) {
+            speedSlider.addEventListener('input', function() {
+                const val = parseInt(this.value);
+                window.Viewer.setRotateSpeed(val);
+                if (speedValue) speedValue.textContent = val;
             });
         }
 
-        // Downloads
-        if (elements.dlGlb) {
-            elements.dlGlb.addEventListener('click', () => {
-                if (modelData?.glb) {
-                    window.API.downloadFile(modelData.glb, 'lumina-model.glb', 'model/gltf-binary');
-                    showToast('GLB downloaded!');
+        // Download GLB
+        if (dlGlb) {
+            dlGlb.addEventListener('click', function() {
+                if (modelData && modelData.glb) {
+                    window.API.download(modelData.glb, 'model.glb', 'model/gltf-binary');
+                    showToast('GLB downloaded!', 'success');
                 }
             });
         }
 
-        if (elements.dlObj) {
-            elements.dlObj.addEventListener('click', () => {
-                if (modelData?.obj) {
-                    window.API.downloadFile(modelData.obj, 'lumina-model.obj', 'text/plain');
-                    showToast('OBJ downloaded!');
+        // Download OBJ
+        if (dlObj) {
+            dlObj.addEventListener('click', function() {
+                if (modelData && modelData.obj) {
+                    window.API.download(modelData.obj, 'model.obj', 'text/plain');
+                    showToast('OBJ downloaded!', 'success');
                 }
             });
         }
 
-        // --- Functions ---
+        // --- FUNCTIONS ---
 
         async function handleGenerate() {
-            const prompt = elements.prompt.value.trim();
+            const text = prompt.value.trim();
             
-            if (!prompt) {
-                showToast('Please enter a prompt');
+            if (!text) {
+                showToast('Please enter a prompt', 'error');
                 return;
             }
 
             setLoading(true);
 
             try {
-                const result = await window.API.generate(prompt, false);
+                console.log('[App] Generating...');
+                const result = await window.API.generate(text, false);
 
                 if (result.success) {
                     modelData = {
@@ -192,37 +196,42 @@
                         obj: result.model_obj
                     };
 
-                    await window.ThreeScene.loadModel(result.model_glb);
+                    await window.Viewer.loadModel(result.model_glb);
 
-                    if (elements.placeholder) elements.placeholder.classList.add('hide');
-                    if (elements.refineField) elements.refineField.classList.add('show');
-                    if (elements.downloads) elements.downloads.classList.add('show');
-                    if (elements.dlGlb) elements.dlGlb.disabled = false;
-                    if (elements.dlObj) elements.dlObj.disabled = false;
+                    // Show UI elements
+                    if (placeholder) placeholder.classList.add('hidden');
+                    if (refineSection) refineSection.classList.add('visible');
+                    if (downloadSection) downloadSection.classList.add('visible');
+                    if (dlGlb) dlGlb.disabled = false;
+                    if (dlObj) dlObj.disabled = false;
 
-                    const objCount = result.model_params?.objects?.length || 1;
-                    showToast(`✓ Generated ${objCount} object(s)!`);
+                    const count = result.model_params?.objects?.length || 1;
+                    showToast('Generated ' + count + ' object(s)!', 'success');
                 } else {
-                    showToast('Failed: ' + (result.message || 'Unknown error'));
+                    showToast(result.message || 'Generation failed', 'error');
                 }
             } catch (err) {
-                console.error('Generate error:', err);
-                showToast('Error: ' + err.message);
+                console.error('[App] Generate error:', err);
+                showToast('Error: ' + err.message, 'error');
             } finally {
                 setLoading(false);
             }
         }
 
         async function handleRefine() {
-            const prompt = elements.refineInput?.value.trim();
+            const text = refineInput ? refineInput.value.trim() : '';
             
-            if (!prompt) {
-                showToast('Enter refinement details');
+            if (!text) {
+                showToast('Enter refinement instructions', 'error');
                 return;
             }
 
+            // Disable button during refinement
+            if (refineBtn) refineBtn.disabled = true;
+
             try {
-                const result = await window.API.generate(prompt, true);
+                console.log('[App] Refining...');
+                const result = await window.API.generate(text, true);
 
                 if (result.success) {
                     modelData = {
@@ -230,64 +239,70 @@
                         obj: result.model_obj
                     };
 
-                    await window.ThreeScene.loadModel(result.model_glb);
-                    if (elements.refineInput) elements.refineInput.value = '';
-
-                    showToast('✓ Model updated!');
+                    await window.Viewer.loadModel(result.model_glb);
+                    
+                    if (refineInput) refineInput.value = '';
+                    showToast('Model updated!', 'success');
                 } else {
-                    showToast('Refinement failed');
+                    showToast(result.message || 'Refinement failed', 'error');
                 }
             } catch (err) {
-                showToast('Error: ' + err.message);
+                console.error('[App] Refine error:', err);
+                showToast('Error: ' + err.message, 'error');
+            } finally {
+                if (refineBtn) refineBtn.disabled = false;
             }
         }
 
         function handleReset() {
-            elements.prompt.value = '';
-            if (elements.refineInput) elements.refineInput.value = '';
+            prompt.value = '';
+            if (refineInput) refineInput.value = '';
             modelData = null;
 
-            if (elements.placeholder) elements.placeholder.classList.remove('hide');
-            if (elements.refineField) elements.refineField.classList.remove('show');
-            if (elements.downloads) elements.downloads.classList.remove('show');
-            if (elements.dlGlb) elements.dlGlb.disabled = true;
-            if (elements.dlObj) elements.dlObj.disabled = true;
+            if (placeholder) placeholder.classList.remove('hidden');
+            if (refineSection) refineSection.classList.remove('visible');
+            if (downloadSection) downloadSection.classList.remove('visible');
+            if (dlGlb) dlGlb.disabled = true;
+            if (dlObj) dlObj.disabled = true;
 
-            // Turn off auto-rotate
-            if (window.ThreeScene.isAutoRotating()) {
-                window.ThreeScene.toggleAutoRotate();
-                if (elements.rotateBtn) elements.rotateBtn.classList.remove('active');
-                if (elements.speedControl) elements.speedControl.style.display = 'none';
+            // Stop auto-rotate
+            if (window.Viewer.isRotating()) {
+                window.Viewer.toggleAutoRotate();
+                if (autoRotateBtn) autoRotateBtn.classList.remove('active');
+                if (speedSliderContainer) speedSliderContainer.classList.remove('visible');
             }
 
-            window.ThreeScene.clearModel();
+            window.Viewer.clearModel();
             window.API.resetSession();
 
             showToast('Canvas cleared');
         }
 
         function setLoading(loading) {
-            if (!elements.genBtn) return;
-
-            elements.genBtn.disabled = loading;
-            
-            if (elements.btnText && elements.btnLoading) {
-                elements.btnText.style.display = loading ? 'none' : 'inline';
-                elements.btnLoading.style.display = loading ? 'inline' : 'none';
-            }
+            if (genBtn) genBtn.disabled = loading;
+            if (genBtn) genBtn.classList.toggle('loading', loading);
         }
 
-        function showToast(message) {
-            if (!elements.toast || !elements.toastText) return;
+        function showToast(message, type) {
+            if (!toast || !toastText) return;
 
-            elements.toastText.textContent = message;
-            elements.toast.classList.add('show');
+            toastText.textContent = message;
+            
+            toast.classList.remove('visible', 'success', 'error');
+            
+            if (type === 'success') toast.classList.add('success');
+            if (type === 'error') toast.classList.add('error');
+            
+            // Force reflow
+            toast.offsetHeight;
+            
+            toast.classList.add('visible');
 
-            setTimeout(() => {
-                elements.toast.classList.remove('show');
+            setTimeout(function() {
+                toast.classList.remove('visible');
             }, 3000);
         }
 
-        console.log('✓ App initialized');
-    }
+        console.log('[App] Ready!');
+    });
 })();
