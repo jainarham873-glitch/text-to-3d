@@ -1,4 +1,4 @@
-const api = {
+window.api = {
     base: (() => {
         const host = window.location.hostname;
         if (host === 'localhost' || host === '127.0.0.1') {
@@ -14,26 +14,36 @@ const api = {
     })(),
 
     async generate(prompt, isRefine = false) {
-        const res = await fetch(`${this.base}/generate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                prompt: prompt,
-                session_id: this.sid,
-                is_refinement: isRefine
-            })
-        });
+        try {
+            const res = await fetch(`${this.base}/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt: prompt,
+                    session_id: this.sid,
+                    is_refinement: isRefine
+                })
+            });
 
-        if (!res.ok) {
-            throw new Error(`Server error: ${res.status}`);
+            if (!res.ok) {
+                throw new Error(`Server error: ${res.status}`);
+            }
+
+            return await res.json();
+        } catch (error) {
+            console.error('API Error:', error);
+            throw error;
         }
-
-        return res.json();
     },
 
     async health() {
-        const res = await fetch(`${this.base}/health`);
-        return res.json();
+        try {
+            const res = await fetch(`${this.base}/health`);
+            return await res.json();
+        } catch (error) {
+            console.error('Health check failed:', error);
+            throw error;
+        }
     },
 
     download(base64, filename, mimeType) {
@@ -64,3 +74,5 @@ const api = {
         localStorage.setItem('sid', this.sid);
     }
 };
+
+console.log('api-client.js loaded');
